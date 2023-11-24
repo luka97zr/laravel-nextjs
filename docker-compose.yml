@@ -6,25 +6,22 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        user: luka
-        uid: 1000
     image: cloudsigma.com/php
     container_name: app
     restart: unless-stopped
     tty: true
-    command: php artisan serve
-    ports:
-      - "9000:9000"
     environment:
       SERVICE_NAME: app
       SERVICE_TAGS: dev
+    # ports:
+    #   - "9000:9000"
     working_dir: /var/www/html/
     volumes:
-      - ./backend:/var/www/html/
+      - ./:/var/www/html/
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
       - ./backend/php/laravel.ini:/usr/local/etc/php/conf.d/laravel.ini
-    depends_on:
-      - db
+    # depends_on:
+    #   - db
     networks:
       - app-network
 
@@ -44,7 +41,7 @@ services:
       SERVICE_TAGS: dev
     working_dir: /var/www/html/
     volumes:
-      - ./frontend:/var/www/html/
+      - ./frontend/:/var/www/html/
     depends_on:
       - app
     networks:
@@ -57,10 +54,12 @@ services:
     tty: true
     ports:
       - "80:80"
+      - "8080:8080"
       - "443:443"
     volumes:
       - ./:/var/www/html/
       - ./nginx/conf.d/:/etc/nginx/conf.d/
+      - ./backend/php/laravel.ini:/usr/local/etc/php/conf.d/laravel.ini
     depends_on:
       - app
       - nextjs
@@ -68,20 +67,35 @@ services:
       - app-network
 
   db:
-    image: mariadb:10.6
+    image: mariadb
     container_name: db
     restart: unless-stopped
     tty: true
     ports:
       - "3306:3306"
+    env_file:
+      - backend/.env
     environment:
-      MYSQL_DATABASE: laravel
-      MYSQL_ROOT_PASSWORD: root
-      SERVICE_TAGS: dev
-      SERVICE_NAME: mysql
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - SERVICE_TAGS=dev
+      - SERVICE_NAME=mysql
     volumes:
       - dbdata:/var/lib/mysql/
-      - ./mysql/my.cnf:/etc/mysql
+      - ./backend/mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - app-network
+    
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    restart: always
+    ports:
+      - 7777:8080
     networks:
       - app-network
 
